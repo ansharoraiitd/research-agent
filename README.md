@@ -43,3 +43,14 @@ applications with LLMs...
 - Used by Uber, LinkedIn, JP Morgan in production...
 ## Conclusion
 LangGraph has become the industry standard...
+
+## Week 4: Multi-Agent Systems
+
+Building a 3-agent pipeline — Planner, Researcher, Writer.
+Each agent is a specialist with one focused job.
+
+Progress:
+- [x] Day 1: Why multi-agent — specialist vs general agent comparison
+- [ ] Day 2: Agent communication — shared state in LangGraph
+- [ ] Day 3: Supervisor pattern — orchestrating multiple agents
+- [ ] Day 4-5: Full multi-agent pipeline assembled
