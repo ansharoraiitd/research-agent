@@ -51,6 +51,7 @@ Each agent is a specialist with one focused job.
 
 Progress:
 - [x] Day 1: Why multi-agent — specialist vs general agent comparison
-- [x] Day 2: Agent communication — shared state in LangGraph
-- [x] Day 3: Supervisor pattern — orchestrating multiple agents
-- [ ] Day 4-5: Full multi-agent pipeline assembled
+- [x] Day 2: Shared state — three agents connected via LangGraph
+- [x] Day 3: Supervisor pattern — orchestrator routing specialists
+- [x] Day 4: Tools in agents — researcher with real web search
+- [ ] Day 5: Complete multi-agent system assembled
