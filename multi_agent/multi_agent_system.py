@@ -26,26 +26,27 @@ search_tool = DuckDuckGoSearchRun()
 class SystemState(TypedDict):
     task: str
     plan: str
-    findings: str
-    report: str
-    critique: str       # critic's feedback on the report
-    approved: bool      # True = report passed quality check
-    revision_count: int # how many times writer has revised
+    findings: str 
+    report: str 
+    critique: str          # critic's feedback on the report
+    approved: bool         # True = report passed quality check
+    revision_count: int     # how many times writer has revised
 
-# ── Node 1: Planner ──────────────────────────────────────────
+
+#Node 1: Planner 
 def planner_node(state: SystemState) -> dict:
     print("\n[1/4 Planner] Creating research plan...")
     prompt = ChatPromptTemplate.from_messages([
         ("system", """You are a research planner. Create exactly 3
-specific, focused search queries. Output numbered list only."""),
+        specific, focused search queries. Output numbered list only."""),
         ("human", "Create 3 search queries for: {task}")
     ])
     chain = prompt | model | StrOutputParser()
     plan = chain.invoke({"task": state["task"]})
     print(f"[Planner] Done")
-    return {"plan": plan}
+    return {"plan": plan}    
 
-# ── Node 2: Researcher ────────────────────────────────────────
+#Node 2: Researcher 
 def researcher_node(state: SystemState) -> dict:
     print("[2/4 Researcher] Searching web + synthesising...")
     time.sleep(1)
@@ -78,6 +79,7 @@ def researcher_node(state: SystemState) -> dict:
     print(f"[Researcher] Done")
     return {"findings": findings}
 
+
 # ── Node 3: Writer ────────────────────────────────────────────
 def writer_node(state: SystemState) -> dict:
     revision = state.get("revision_count", 0)
@@ -94,20 +96,19 @@ def writer_node(state: SystemState) -> dict:
 
     prompt = ChatPromptTemplate.from_messages([
         ("system", """You are a technical writer. Write a structured report.
-Format:
-# [Title]
-## Summary
-[2-3 sentences]
-## Key Findings
-- [finding with specific detail]
-- [finding with specific detail]
-- [finding with specific detail]
-## Conclusion
-[1-2 sentences]"""),
+        Format:
+        # [Title]
+        ## Summary
+        [2-3 sentences]
+        ## Key Findings
+        - [finding with specific detail]
+        - [finding with specific detail]
+        - [finding with specific detail]
+        ## Conclusion
+        [1-2 sentences]"""),  
         ("human", """Write report on: {task}
-
-Research findings:
-{findings}{critique_context}""")
+        Research findings:
+        {findings}{critique_context}""")
     ])
 
     chain = prompt | model | StrOutputParser()
@@ -119,6 +120,7 @@ Research findings:
     print(f"[Writer] Done")
     return {"report": report, "revision_count": revision + 1}
 
+
 # ── Node 4: Critic ────────────────────────────────────────────
 def critic_node(state: SystemState) -> dict:
     print("[4/4 Critic] Reviewing report quality...")
@@ -126,17 +128,15 @@ def critic_node(state: SystemState) -> dict:
 
     prompt = ChatPromptTemplate.from_messages([
         ("system", """You are a quality reviewer. Review this report strictly.
-Check: Does it have a title, summary, 3+ key findings, and conclusion?
-Are the findings specific with real details (not vague)?
+        Check: Does it have a title, summary, 3+ key findings, and conclusion?
+        Are the findings specific with real details (not vague)?
 
-Respond with exactly:
-APPROVED - if the report meets all requirements
-REVISION NEEDED: [specific issue] - if it needs improvement"""),
+        Respond with exactly:
+        APPROVED - if the report meets all requirements
+        REVISION NEEDED: [specific issue] - if it needs improvement"""),
         ("human", """Review this report:
-
-{report}
-
-Verdict:""")
+        {report}
+        Verdict:""")
     ])
 
     chain = prompt | model | StrOutputParser()
@@ -145,6 +145,7 @@ Verdict:""")
 
     approved = verdict.upper().startswith("APPROVED")
     return {"critique": verdict, "approved": approved}
+
 
 # ── Routing function ──────────────────────────────────────────
 def route_after_critic(state: SystemState) -> str:
@@ -161,7 +162,8 @@ def route_after_critic(state: SystemState) -> str:
     print("[Critic] Sending back to writer for revision...")
     return "writer"
 
-# ── Build the graph ───────────────────────────────────────────
+
+#Build the graph
 builder = StateGraph(SystemState)
 
 builder.add_node("planner", planner_node)
@@ -183,7 +185,7 @@ builder.add_conditional_edges(
 
 system = builder.compile()
 
-# ── Run it ────────────────────────────────────────────────────
+#Running our system:
 def run(task: str):
     print(f"\n{'='*55}")
     print(f"MULTI-AGENT RESEARCH SYSTEM")
