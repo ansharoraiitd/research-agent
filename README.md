@@ -44,14 +44,35 @@ applications with LLMs...
 ## Conclusion
 LangGraph has become the industry standard...
 
-## Week 4: Multi-Agent Systems
+## Multi-Agent Research System
 
-Building a 3-agent pipeline — Planner, Researcher, Writer.
-Each agent is a specialist with one focused job.
+A production-grade multi-agent pipeline with 4 specialist agents
+and a quality control loop.
 
-Progress:
-- [x] Day 1: Why multi-agent — specialist vs general agent comparison
-- [x] Day 2: Shared state — three agents connected via LangGraph
-- [x] Day 3: Supervisor pattern — orchestrator routing specialists
-- [x] Day 4: Tools in agents — researcher with real web search
-- [ ] Day 5: Complete multi-agent system assembled
+### Architecture
+Planner → Researcher (web search) → Writer → Critic
+                                         ↑         |
+                                         └─revise──┘ (if needed)
+
+### Agents
+| Agent | Job | Tools |
+|-------|-----|-------|
+| Planner | Creates 3 focused search queries | None |
+| Researcher | Searches web, synthesises findings | DuckDuckGo |
+| Writer | Writes structured report | None |
+| Critic | Reviews quality, approves or requests revision | None |
+
+### Key design decisions
+- Critic caps revisions at 2 to prevent infinite loops
+- Researcher does two steps: search then synthesise
+- State flows through all agents — each reads what previous agents wrote
+- Conditional edge after critic — approve or route back to writer
+
+### Files
+| File | What it builds |
+|------|---------------|
+| multi_agent_system.py | Complete 4-agent pipeline |
+| 01_why_multi_agent.py | Single vs specialist comparison |
+| 02_shared_state.py | Three agents with shared LangGraph state |
+| 03_supervisor.py | Supervisor orchestration pattern |
+| 04_agents_with_tools.py | Researcher with web search tool |
