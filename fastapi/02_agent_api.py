@@ -1,65 +1,67 @@
-# WHAT THIS DOES:
-# FastAPI server with the real multi-agent pipeline connected.
-# POST /research triggers the full planner→researcher→writer→critic pipeline.
-# async def means the server doesn't block while the agent is running.
-# This is your agent accessible via HTTP for the first time.
+#WHAT THIS DOES:
+#FastAPI server with real multi-agent pipeline connected.
+#POST /research triggers the full planner-researcher-writer-critic pipeline.
+#async def means the server doesn't block while the agent is running.
+#This is our agent accessible via HTTP for the first time.
 
-import sys
-import os
-import time
+import os 
+import sys 
+import time 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from fastapi import FastAPI, HTTPException, BackgroundTasks
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional 
 import uvicorn
 
-# Import the multi-agent pipeline from week 4
-from multi_agent.multi_agent_system import system as agent_pipeline
+#Now we import the multi-agent pipeline from earlier 
+from multi_agent.multi_agent_system import system as agent_pipeline 
 
 app = FastAPI(
     title="Multi-Agent Research API",
     description="""A production REST API wrapping a 4-agent research system.
     
-Agents:
-- **Planner**: Creates focused search queries
-- **Researcher**: Searches web, synthesises findings  
-- **Writer**: Produces structured report
-- **Critic**: Reviews quality, requests revisions if needed
-    """,
+    Agents:
+    -**Planner**: Creates focused search queries
+    -**Researcher**: Searches web, synthesises findings
+    -**Writer**: Produces structured report
+    -**Critic**: Reviews quality, requests revisions if needed""",
     version="2.0.0"
 )
 
-# ── Request and Response models ──────────────────────────────
+#Request and Response models:
 class ResearchRequest(BaseModel):
     task: str
-    max_revisions: Optional[int] = 2
+    max_revisions: Optional[int]=2
 
     class Config:
-        json_schema_extra = {
+        json_scheme_extra={
             "example": {
                 "task": "How is LangGraph being used in production AI in 2025?",
                 "max_revisions": 2
             }
         }
 
+
 class ResearchResponse(BaseModel):
-    task: str
-    report: str
-    approved: bool
-    revisions: int
-    status: str
+    task: str 
+    report: str 
+    approved: bool 
+    revisions: int 
+    status: str 
+
 
 class ErrorResponse(BaseModel):
-    error: str
-    detail: str
+    error: str 
+    detail: str 
 
-# ── Simple in-memory job tracking ────────────────────────────
-# In production this would be Redis or a database.
-# For now a dict is enough to track running jobs.
-jobs = {}
+#Simple in-memory job tracking: 
+#In production, this would be Redis or a database.
+#For now, we will use a dict to track running jobs.
+jobs={}
 
-# ── Routes ───────────────────────────────────────────────────
+
+#Routes: 
 @app.get("/")
 def root():
     return {
@@ -68,9 +70,14 @@ def root():
         "endpoints": ["/health", "/research", "/research/quick"]
     }
 
+
 @app.get("/health")
 def health():
-    return {"status": "healthy", "agents": 4, "version": "2.0.0"}
+    return {
+        "status": "healthy",
+        "agents": 4,
+        "version": "2.0.0"
+    }
 
 
 @app.post("/research", response_model=ResearchResponse)
@@ -85,25 +92,26 @@ async def run_research(request: ResearchRequest):
     
     Takes 20-40 seconds depending on web search speed.
     """
-    # Validate input
+    #Also we need to validate input:
     if not request.task.strip():
         raise HTTPException(
             status_code=400,
-            detail="Task cannot be empty"
+            detail="Task cannot be empty."
         )
 
     if len(request.task) > 500:
         raise HTTPException(
             status_code=400,
-            detail="Task too long — maximum 500 characters"
-        )
+            detail="Task is too long - maximum 500 characters"
+        )    
 
+    
     try:
         print(f"\n[API] Starting research: {request.task[:50]}...")
         start_time = time.time()
 
-        # Run the multi-agent pipeline
-        # This is the actual agent from week 4
+        #Run the multi-agent pipeline
+        #This is the agent we built earlier 
         result = agent_pipeline.invoke({
             "task": request.task,
             "plan": "",
@@ -138,7 +146,7 @@ async def quick_research(request: ResearchRequest):
     """
     Quick research — skips web search, uses model knowledge only.
     Faster (5-10s) but less current information.
-    Good for testing the API without burning search requests.
+    Good for testing the API without burning search requests.        
     """
     if not request.task.strip():
         raise HTTPException(status_code=400, detail="Task cannot be empty")
@@ -149,10 +157,10 @@ async def quick_research(request: ResearchRequest):
     from dotenv import load_dotenv
     load_dotenv()
 
-    llm = ChatGoogleGenerativeAI(model="gemini-2.0-flash")
-    prompt = ChatPromptTemplate.from_messages([
+    llm=ChatGoogleGenerativeAI(model="gemini-3.1-flash-lite")
+    prompt=ChatPromptTemplate.from_messages([
         ("system", """You are a research writer. Write a structured report.
-Format: # Title, ## Summary (2-3 sentences), ## Key Findings (3 bullets), ## Conclusion"""),
+        Format: # Title, ## Summary (2-3 sentences), ## Key Findings (3 bullets), ## Conclusion"""),
         ("human", "Write a research report on: {task}")
     ])
     chain = prompt | llm | StrOutputParser()
@@ -167,6 +175,12 @@ Format: # Title, ## Summary (2-3 sentences), ## Key Findings (3 bullets), ## Con
     )
 
 
-# ── Run the server ───────────────────────────────────────────
+#Now we run the server 
 if __name__ == "__main__":
     uvicorn.run("02_agent_api:app", host="0.0.0.0", port=8000, reload=True)
+
+
+
+
+
+        
