@@ -1,186 +1,143 @@
-#WHAT THIS DOES:
-#FastAPI server with real multi-agent pipeline connected.
-#POST /research triggers the full planner-researcher-writer-critic pipeline.
-#async def means the server doesn't block while the agent is running.
-#This is our agent accessible via HTTP for the first time.
-
+#Section 1: imports
+import sys
 import os 
-import sys 
 import time 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from fastapi import FastAPI, HTTPException, BackgroundTasks
-from pydantic import BaseModel
+from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel 
 from typing import Optional 
-import uvicorn
+import uvicorn 
+from dotenv import load_dotenv
 
-#Now we import the multi-agent pipeline from earlier 
-from multi_agent.multi_agent_system import system as agent_pipeline 
+load_dotenv()
+
+from multi_agent.multi_agent_system import system as agent_pipeline
+
+
+#Section 2: creating the app and the models
 
 app = FastAPI(
     title="Multi-Agent Research API",
-    description="""A production REST API wrapping a 4-agent research system.
-    
-    Agents:
-    -**Planner**: Creates focused search queries
-    -**Researcher**: Searches web, synthesises findings
-    -**Writer**: Produces structured report
-    -**Critic**: Reviews quality, requests revisions if needed""",
+    description="4-agent pipeline: Planner -> Researcher -> Writer -> Critic",
     version="2.0.0"
 )
 
-#Request and Response models:
 class ResearchRequest(BaseModel):
-    task: str
-    max_revisions: Optional[int]=2
+    task: str 
+    mode: Optional[str] = "quick"
 
     class Config:
-        json_scheme_extra={
+        json_scheme_extra = {
             "example": {
-                "task": "How is LangGraph being used in production AI in 2025?",
-                "max_revisions": 2
+                "task": "How is LangGraph used in production AI in 2026?",
+                "mode": "quick"
             }
         }
-
 
 class ResearchResponse(BaseModel):
     task: str 
     report: str 
     approved: bool 
     revisions: int 
-    status: str 
+    duration_seconds: float
 
 
-class ErrorResponse(BaseModel):
-    error: str 
-    detail: str 
+#Section 3 - routes 
 
-#Simple in-memory job tracking: 
-#In production, this would be Redis or a database.
-#For now, we will use a dict to track running jobs.
-jobs={}
-
-
-#Routes: 
 @app.get("/")
 def root():
     return {
         "message": "Multi-Agent Research API",
         "docs": "/docs",
-        "endpoints": ["/health", "/research", "/research/quick"]
+        "endpoints": ["/health", "/research"]
     }
 
-
-@app.get("/health")
+@app.get("/health") 
 def health():
-    return {
-        "status": "healthy",
-        "agents": 4,
-        "version": "2.0.0"
-    }
+    return {"status": "healthy", "agents": 4, "version": "2.0.0"}
 
 
-@app.post("/research", response_model=ResearchResponse)
+@app.post("/research", response_model=ResearchResponse)    
 async def run_research(request: ResearchRequest):
     """
-    Run the full 4-agent research pipeline.
-    
-    - Planner creates search queries
-    - Researcher searches web and synthesises findings
-    - Writer produces structured report
-    - Critic reviews and may request revisions
-    
-    Takes 20-40 seconds depending on web search speed.
+    Run the research pipeline.
+    mode='quick' - fast, uses model knowledge (5-10s)
+    mode='full' - slow, uses web search (30-40s)
     """
-    #Also we need to validate input:
-    if not request.task.strip():
-        raise HTTPException(
-            status_code=400,
-            detail="Task cannot be empty."
-        )
-
-    if len(request.task) > 500:
-        raise HTTPException(
-            status_code=400,
-            detail="Task is too long - maximum 500 characters"
-        )    
-
-    
-    try:
-        print(f"\n[API] Starting research: {request.task[:50]}...")
-        start_time = time.time()
-
-        #Run the multi-agent pipeline
-        #This is the agent we built earlier 
-        result = agent_pipeline.invoke({
-            "task": request.task,
-            "plan": "",
-            "findings": "",
-            "report": "",
-            "critique": "",
-            "approved": False,
-            "revision_count": 0
-        })
-
-        elapsed = round(time.time() - start_time, 1)
-        print(f"[API] Completed in {elapsed}s")
-
-        return ResearchResponse(
-            task=result["task"],
-            report=result["report"],
-            approved=result["approved"],
-            revisions=result["revision_count"],
-            status=f"completed in {elapsed}s"
-        )
-
-    except Exception as e:
-        print(f"[API] Error: {e}")
-        raise HTTPException(
-            status_code=500,
-            detail=f"Agent pipeline failed: {str(e)}"
-        )
-
-
-@app.post("/research/quick")
-async def quick_research(request: ResearchRequest):
-    """
-    Quick research — skips web search, uses model knowledge only.
-    Faster (5-10s) but less current information.
-    Good for testing the API without burning search requests.        
-    """
+    #validate inputs 
     if not request.task.strip():
         raise HTTPException(status_code=400, detail="Task cannot be empty")
 
-    from langchain_google_genai import ChatGoogleGenerativeAI
-    from langchain_core.prompts import ChatPromptTemplate
-    from langchain_core.output_parsers import StrOutputParser
-    from dotenv import load_dotenv
-    load_dotenv()
+    if len(request.task) > 300:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Task too long ({len(request.task)} chars). max 300."
+        )
 
-    llm=ChatGoogleGenerativeAI(model="gemini-3.1-flash-lite")
-    prompt=ChatPromptTemplate.from_messages([
-        ("system", """You are a research writer. Write a structured report.
-        Format: # Title, ## Summary (2-3 sentences), ## Key Findings (3 bullets), ## Conclusion"""),
-        ("human", "Write a research report on: {task}")
-    ])
-    chain = prompt | llm | StrOutputParser()
-    report = chain.invoke({"task": request.task})
+    if request.mode not in ["quick", "full"]:
+        raise HTTPException(
+            status_code=400,
+            detail="mode must be 'quick' or 'full'"
+        )        
 
-    return ResearchResponse(
-        task=request.task,
-        report=report,
-        approved=True,
-        revisions=0,
-        status="quick mode - no web search"
-    )
+    start = time.time()
+
+    try:
+        if request.mode == "quick":
+            #Fast path - LLM answers from training knowledge
+            from langchain_google_genai import ChatGoogleGenerativeAI
+            from langchain_core.prompts import ChatPromptTemplate 
+            from langchain_core.output_parsers import StrOutputParser
+
+            llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash-lite")
+            prompt=ChatPromptTemplate.from_messages([
+                ("system", """Write a structured research report.
+                Format: #Title, ##Summary (2-3 sentences), ###Key Findings (3 bullet points), ##Conclusion (1 sentence)"""),
+                ("human", "Write a research report on: {task}")
+            ])
+            report = (prompt | llm | StrOutputParser()).invoke(
+                {"task": request.task}
+            )
+            approved = True 
+            revisions = 0
+
+        else:
+            #Full path - real 4-agent pipeline with web search 
+            result = agent_pipeline.invoke({
+                "task": request.task,
+                "plan": "",
+                "findings": "",
+                "report": "",
+                "critique": "",
+                "approved": False,
+                "revision_count": 0
+            })    
+            report = result["report"]
+            approved = result["approved"]
+            revisions = result["revision_count"]
+
+        duration = round(time.time() - start, 1)
+
+        return ResearchResponse(
+            task=request.task,
+            report=report,
+            approved=approved,
+            revisions=revisions,
+            duration_seconds=duration
+        )    
+
+    except HTTPException:
+        raise 
+    except Exception as e:
+            raise HTTPException(
+                status_code=500,
+                detail=f"Pipeline failed: {str(e)}"
+            )    
 
 
-#Now we run the server 
 if __name__ == "__main__":
-    uvicorn.run("02_agent_api:app", host="0.0.0.0", port=8000, reload=True)
+    uvicorn.run("02_agent_api:app", host="0.0.0.0", port=8000, reload=True)            
 
 
 
-
-
-        
