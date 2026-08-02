@@ -1,3 +1,7 @@
+## Live Demo
+API: https://research-agent-513976967636.us-central1.run.app
+Docs: https://research-agent-513976967636.us-central1.run.app/docs
+
 # Research Agent
 
 An agentic AI research assistant built with LangGraph and LangChain.
